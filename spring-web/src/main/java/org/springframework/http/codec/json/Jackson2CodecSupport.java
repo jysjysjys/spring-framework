@@ -28,10 +28,14 @@ import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.codec.Hints;
+import org.springframework.http.HttpLog;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeType;
@@ -61,6 +65,8 @@ public abstract class Jackson2CodecSupport {
 					new MimeType("application", "json", StandardCharsets.UTF_8),
 					new MimeType("application", "*+json", StandardCharsets.UTF_8)));
 
+
+	protected final Log logger = HttpLog.create(LogFactory.getLog(getClass()));
 
 	private final ObjectMapper objectMapper;
 
@@ -106,10 +112,10 @@ public abstract class Jackson2CodecSupport {
 			if (annotation != null) {
 				Class<?>[] classes = annotation.value();
 				Assert.isTrue(classes.length == 1, JSON_VIEW_HINT_ERROR + param);
-				return Collections.singletonMap(JSON_VIEW_HINT, classes[0]);
+				return Hints.from(JSON_VIEW_HINT, classes[0]);
 			}
 		}
-		return Collections.emptyMap();
+		return Hints.none();
 	}
 
 	@Nullable

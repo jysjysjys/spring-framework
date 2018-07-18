@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -171,7 +172,7 @@ import org.springframework.util.StringUtils;
  * @author Colin Sampaleanu
  * @author Marius Bogoevici
  * @author Costin Leau
- * @author Phil Webb
+ * @author Phillip Webb
  * @since 1.0.2
  * @see #CLASSPATH_ALL_URL_PREFIX
  * @see org.springframework.util.AntPathMatcher
@@ -290,7 +291,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 			// Generally only look for a pattern after a prefix here,
 			// and on Tomcat only after the "*/" separator for its "war:" protocol.
 			int prefixEnd = (locationPattern.startsWith("war:") ? locationPattern.indexOf("*/") + 1 :
-					locationPattern.indexOf(":") + 1);
+					locationPattern.indexOf(':') + 1);
 			if (getPathMatcher().isPattern(locationPattern.substring(prefixEnd))) {
 				// a file pattern
 				return findPathMatchingResources(locationPattern);
@@ -320,7 +321,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 		if (logger.isDebugEnabled()) {
 			logger.debug("Resolved classpath location [" + location + "] to resources " + result);
 		}
-		return result.toArray(new Resource[result.size()]);
+		return result.toArray(new Resource[0]);
 	}
 
 	/**
@@ -493,14 +494,12 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 		for (Resource rootDirResource : rootDirResources) {
 			rootDirResource = resolveRootDirResource(rootDirResource);
 			URL rootDirUrl = rootDirResource.getURL();
-			if (equinoxResolveMethod != null) {
-				if (rootDirUrl.getProtocol().startsWith("bundle")) {
-					URL resolvedUrl = (URL) ReflectionUtils.invokeMethod(equinoxResolveMethod, null, rootDirUrl);
-					if (resolvedUrl != null) {
-						rootDirUrl = resolvedUrl;
-					}
-					rootDirResource = new UrlResource(rootDirUrl);
+			if (equinoxResolveMethod != null && rootDirUrl.getProtocol().startsWith("bundle")) {
+				URL resolvedUrl = (URL) ReflectionUtils.invokeMethod(equinoxResolveMethod, null, rootDirUrl);
+				if (resolvedUrl != null) {
+					rootDirUrl = resolvedUrl;
 				}
+				rootDirResource = new UrlResource(rootDirUrl);
 			}
 			if (rootDirUrl.getProtocol().startsWith(ResourceUtils.URL_PROTOCOL_VFS)) {
 				result.addAll(VfsResourceMatchingDelegate.findMatchingResources(rootDirUrl, subPattern, getPathMatcher()));
@@ -515,7 +514,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 		if (logger.isDebugEnabled()) {
 			logger.debug("Resolved location pattern [" + locationPattern + "] to resources " + result);
 		}
-		return result.toArray(new Resource[result.size()]);
+		return result.toArray(new Resource[0]);
 	}
 
 	/**
@@ -531,7 +530,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 	 * @see #retrieveMatchingFiles
 	 */
 	protected String determineRootDir(String location) {
-		int prefixEnd = location.indexOf(":") + 1;
+		int prefixEnd = location.indexOf(':') + 1;
 		int rootDirEnd = location.length();
 		while (rootDirEnd > prefixEnd && getPathMatcher().isPattern(location.substring(prefixEnd, rootDirEnd))) {
 			rootDirEnd = location.lastIndexOf('/', rootDirEnd - 2) + 1;
@@ -785,15 +784,7 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 			logger.debug("Searching directory [" + dir.getAbsolutePath() +
 					"] for files matching pattern [" + fullPattern + "]");
 		}
-		File[] dirContents = dir.listFiles();
-		if (dirContents == null) {
-			if (logger.isWarnEnabled()) {
-				logger.warn("Could not retrieve contents of directory [" + dir.getAbsolutePath() + "]");
-			}
-			return;
-		}
-		Arrays.sort(dirContents);
-		for (File content : dirContents) {
+		for (File content : listDirectory(dir)) {
 			String currPath = StringUtils.replace(content.getAbsolutePath(), File.separator, "/");
 			if (content.isDirectory() && getPathMatcher().matchStart(fullPattern, currPath + "/")) {
 				if (!content.canRead()) {
@@ -810,6 +801,25 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 				result.add(content);
 			}
 		}
+	}
+
+	/**
+	 * Determine a sorted list of files in the given directory.
+	 * @param dir the directory to introspect
+	 * @return the sorted list of files (by default in alphabetical order)
+	 * @since 5.1
+	 * @see File#listFiles()
+	 */
+	protected File[] listDirectory(File dir) {
+		File[] files = dir.listFiles();
+		if (files == null) {
+			if (logger.isWarnEnabled()) {
+				logger.warn("Could not retrieve contents of directory [" + dir.getAbsolutePath() + "]");
+			}
+			return new File[0];
+		}
+		Arrays.sort(files, Comparator.comparing(File::getName));
+		return files;
 	}
 
 

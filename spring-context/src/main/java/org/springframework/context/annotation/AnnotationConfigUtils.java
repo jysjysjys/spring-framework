@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.Set;
 
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor;
-import org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
@@ -54,13 +53,12 @@ import org.springframework.util.ClassUtils;
  * @author Stephane Nicoll
  * @since 2.5
  * @see ContextAnnotationAutowireCandidateResolver
- * @see CommonAnnotationBeanPostProcessor
  * @see ConfigurationClassPostProcessor
+ * @see CommonAnnotationBeanPostProcessor
  * @see org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor
- * @see org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor
  * @see org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor
  */
-public class AnnotationConfigUtils {
+public abstract class AnnotationConfigUtils {
 
 	/**
 	 * The bean name of the internally managed Configuration annotation processor.
@@ -87,7 +85,9 @@ public class AnnotationConfigUtils {
 
 	/**
 	 * The bean name of the internally managed Required annotation processor.
+	 * @deprecated as of 5.1, since no Required processor is registered by default anymore
 	 */
+	@Deprecated
 	public static final String REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME =
 			"org.springframework.context.annotation.internalRequiredAnnotationProcessor";
 
@@ -102,7 +102,6 @@ public class AnnotationConfigUtils {
 	 */
 	public static final String PERSISTENCE_ANNOTATION_PROCESSOR_BEAN_NAME =
 			"org.springframework.context.annotation.internalPersistenceAnnotationProcessor";
-
 
 	private static final String PERSISTENCE_ANNOTATION_PROCESSOR_CLASS_NAME =
 			"org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor";
@@ -168,12 +167,6 @@ public class AnnotationConfigUtils {
 			RootBeanDefinition def = new RootBeanDefinition(AutowiredAnnotationBeanPostProcessor.class);
 			def.setSource(source);
 			beanDefs.add(registerPostProcessor(registry, def, AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME));
-		}
-
-		if (!registry.containsBeanDefinition(REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME)) {
-			RootBeanDefinition def = new RootBeanDefinition(RequiredAnnotationBeanPostProcessor.class);
-			def.setSource(source);
-			beanDefs.add(registerPostProcessor(registry, def, REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME));
 		}
 
 		// Check for JSR-250 support, and if present add the CommonAnnotationBeanPostProcessor.
@@ -298,18 +291,23 @@ public class AnnotationConfigUtils {
 	}
 
 	@SuppressWarnings("unchecked")
-	static Set<AnnotationAttributes> attributesForRepeatable(AnnotationMetadata metadata,
-			String containerClassName, String annotationClassName) {
+	static Set<AnnotationAttributes> attributesForRepeatable(
+			AnnotationMetadata metadata, String containerClassName, String annotationClassName) {
 
 		Set<AnnotationAttributes> result = new LinkedHashSet<>();
+
+		// Direct annotation present?
 		addAttributesIfNotNull(result, metadata.getAnnotationAttributes(annotationClassName, false));
 
+		// Container annotation present?
 		Map<String, Object> container = metadata.getAnnotationAttributes(containerClassName, false);
 		if (container != null && container.containsKey("value")) {
 			for (Map<String, Object> containedAttributes : (Map<String, Object>[]) container.get("value")) {
 				addAttributesIfNotNull(result, containedAttributes);
 			}
 		}
+
+		// Return merged result
 		return Collections.unmodifiableSet(result);
 	}
 

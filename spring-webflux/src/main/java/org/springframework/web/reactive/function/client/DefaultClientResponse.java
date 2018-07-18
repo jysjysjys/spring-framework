@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.codec.Hints;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -54,17 +55,30 @@ class DefaultClientResponse implements ClientResponse {
 
 	private final ExchangeStrategies strategies;
 
+	private final String logPrefix;
 
-	public DefaultClientResponse(ClientHttpResponse response, ExchangeStrategies strategies) {
+
+	public DefaultClientResponse(ClientHttpResponse response, ExchangeStrategies strategies, String logPrefix) {
 		this.response = response;
 		this.strategies = strategies;
 		this.headers = new DefaultHeaders();
+		this.logPrefix = logPrefix;
 	}
 
 
 	@Override
+	public ExchangeStrategies strategies() {
+		return this.strategies;
+	}
+
+	@Override
 	public HttpStatus statusCode() {
 		return this.response.getStatusCode();
+	}
+
+	@Override
+	public int rawStatusCode() {
+		return this.response.getRawStatusCode();
 	}
 
 	@Override
@@ -84,15 +98,13 @@ class DefaultClientResponse implements ClientResponse {
 			public List<HttpMessageReader<?>> messageReaders() {
 				return strategies.messageReaders();
 			}
-
 			@Override
 			public Optional<ServerHttpResponse> serverResponse() {
 				return Optional.empty();
 			}
-
 			@Override
 			public Map<String, Object> hints() {
-				return Collections.emptyMap();
+				return Hints.from(Hints.LOG_PREFIX_HINT, logPrefix);
 			}
 		});
 	}
@@ -170,11 +182,11 @@ class DefaultClientResponse implements ClientResponse {
 
 	private <T> Mono<ResponseEntity<T>> toEntityInternal(Mono<T> bodyMono) {
 		HttpHeaders headers = headers().asHttpHeaders();
-		HttpStatus statusCode = statusCode();
+		int status = rawStatusCode();
 		return bodyMono
-				.map(body -> new ResponseEntity<>(body, headers, statusCode))
+				.map(body -> createEntity(body, headers, status))
 				.switchIfEmpty(Mono.defer(
-						() -> Mono.just(new ResponseEntity<>(headers, statusCode))));
+						() -> Mono.just(createEntity(headers, status))));
 	}
 
 	@Override
@@ -183,17 +195,30 @@ class DefaultClientResponse implements ClientResponse {
 	}
 
 	@Override
-	public <T> Mono<ResponseEntity<List<T>>> toEntityList(
-			ParameterizedTypeReference<T> typeReference) {
+	public <T> Mono<ResponseEntity<List<T>>> toEntityList(ParameterizedTypeReference<T> typeReference) {
 		return toEntityListInternal(bodyToFlux(typeReference));
 	}
 
 	private <T> Mono<ResponseEntity<List<T>>> toEntityListInternal(Flux<T> bodyFlux) {
 		HttpHeaders headers = headers().asHttpHeaders();
-		HttpStatus statusCode = statusCode();
+		int status = rawStatusCode();
 		return bodyFlux
 				.collectList()
-				.map(body -> new ResponseEntity<>(body, headers, statusCode));
+				.map(body -> createEntity(body, headers, status));
+	}
+
+	private <T> ResponseEntity<T> createEntity(HttpHeaders headers, int status) {
+		HttpStatus resolvedStatus = HttpStatus.resolve(status);
+		return resolvedStatus != null
+				? new ResponseEntity<>(headers, resolvedStatus)
+				: ResponseEntity.status(status).headers(headers).build();
+	}
+
+	private <T> ResponseEntity<T> createEntity(T body, HttpHeaders headers, int status) {
+		HttpStatus resolvedStatus = HttpStatus.resolve(status);
+		return resolvedStatus != null
+				? new ResponseEntity<>(body, headers, resolvedStatus)
+				: ResponseEntity.status(status).headers(headers).body(body);
 	}
 
 
@@ -216,7 +241,7 @@ class DefaultClientResponse implements ClientResponse {
 		@Override
 		public List<String> header(String headerName) {
 			List<String> headerValues = delegate().get(headerName);
-			return headerValues != null ? headerValues : Collections.emptyList();
+			return (headerValues != null ? headerValues : Collections.emptyList());
 		}
 
 		@Override
@@ -225,12 +250,13 @@ class DefaultClientResponse implements ClientResponse {
 		}
 
 		private OptionalLong toOptionalLong(long value) {
-			return value != -1 ? OptionalLong.of(value) : OptionalLong.empty();
+			return (value != -1 ? OptionalLong.of(value) : OptionalLong.empty());
 		}
-
 	}
+
 
 	@SuppressWarnings("serial")
-	private class ReadCancellationException extends RuntimeException {
+	private static class ReadCancellationException extends RuntimeException {
 	}
+
 }

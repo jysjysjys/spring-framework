@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.context.weaving.LoadTimeWeaverAware;
 import org.springframework.context.weaving.LoadTimeWeaverAwareProcessor;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
@@ -159,58 +160,58 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	/** Logger used by this class. Available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	/** Unique id for this context, if any */
+	/** Unique id for this context, if any. */
 	private String id = ObjectUtils.identityToString(this);
 
-	/** Display name */
+	/** Display name. */
 	private String displayName = ObjectUtils.identityToString(this);
 
-	/** Parent context */
+	/** Parent context. */
 	@Nullable
 	private ApplicationContext parent;
 
-	/** Environment used by this context */
+	/** Environment used by this context. */
 	@Nullable
 	private ConfigurableEnvironment environment;
 
-	/** BeanFactoryPostProcessors to apply on refresh */
+	/** BeanFactoryPostProcessors to apply on refresh. */
 	private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
 
-	/** System time in milliseconds when this context started */
+	/** System time in milliseconds when this context started. */
 	private long startupDate;
 
-	/** Flag that indicates whether this context is currently active */
+	/** Flag that indicates whether this context is currently active. */
 	private final AtomicBoolean active = new AtomicBoolean();
 
-	/** Flag that indicates whether this context has been closed already */
+	/** Flag that indicates whether this context has been closed already. */
 	private final AtomicBoolean closed = new AtomicBoolean();
 
-	/** Synchronization monitor for the "refresh" and "destroy" */
+	/** Synchronization monitor for the "refresh" and "destroy". */
 	private final Object startupShutdownMonitor = new Object();
 
-	/** Reference to the JVM shutdown hook, if registered */
+	/** Reference to the JVM shutdown hook, if registered. */
 	@Nullable
 	private Thread shutdownHook;
 
-	/** ResourcePatternResolver used by this context */
+	/** ResourcePatternResolver used by this context. */
 	private ResourcePatternResolver resourcePatternResolver;
 
-	/** LifecycleProcessor for managing the lifecycle of beans within this context */
+	/** LifecycleProcessor for managing the lifecycle of beans within this context. */
 	@Nullable
 	private LifecycleProcessor lifecycleProcessor;
 
-	/** MessageSource we delegate our implementation of this interface to */
+	/** MessageSource we delegate our implementation of this interface to. */
 	@Nullable
 	private MessageSource messageSource;
 
-	/** Helper class used in event publishing */
+	/** Helper class used in event publishing. */
 	@Nullable
 	private ApplicationEventMulticaster applicationEventMulticaster;
 
-	/** Statically specified listeners */
+	/** Statically specified listeners. */
 	private final Set<ApplicationListener<?>> applicationListeners = new LinkedHashSet<>();
 
-	/** ApplicationEvents published early */
+	/** ApplicationEvents published early. */
 	@Nullable
 	private Set<ApplicationEvent> earlyApplicationEvents;
 
@@ -900,15 +901,18 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
-	 * Reset Spring's common core caches, in particular the {@link ReflectionUtils},
-	 * {@link ResolvableType} and {@link CachedIntrospectionResults} caches.
+	 * Reset Spring's common reflection metadata caches, in particular the
+	 * {@link ReflectionUtils}, {@link AnnotationUtils}, {@link ResolvableType}
+	 * and {@link CachedIntrospectionResults} caches.
 	 * @since 4.2
 	 * @see ReflectionUtils#clearCache()
+	 * @see AnnotationUtils#clearCache()
 	 * @see ResolvableType#clearCache()
 	 * @see CachedIntrospectionResults#clearClassLoader(ClassLoader)
 	 */
 	protected void resetCommonCaches() {
 		ReflectionUtils.clearCache();
+		AnnotationUtils.clearCache();
 		ResolvableType.clearCache();
 		CachedIntrospectionResults.clearClassLoader(getClassLoader());
 	}
@@ -1248,8 +1252,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 */
 	@Nullable
 	protected BeanFactory getInternalParentBeanFactory() {
-		return (getParent() instanceof ConfigurableApplicationContext) ?
-				((ConfigurableApplicationContext) getParent()).getBeanFactory() : getParent();
+		return (getParent() instanceof ConfigurableApplicationContext ?
+				((ConfigurableApplicationContext) getParent()).getBeanFactory() : getParent());
 	}
 
 
@@ -1258,12 +1262,12 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	//---------------------------------------------------------------------
 
 	@Override
-	public String getMessage(String code, @Nullable Object args[], @Nullable String defaultMessage, Locale locale) {
+	public String getMessage(String code, @Nullable Object[] args, @Nullable String defaultMessage, Locale locale) {
 		return getMessageSource().getMessage(code, args, defaultMessage, locale);
 	}
 
 	@Override
-	public String getMessage(String code, @Nullable Object args[], Locale locale) throws NoSuchMessageException {
+	public String getMessage(String code, @Nullable Object[] args, Locale locale) throws NoSuchMessageException {
 		return getMessageSource().getMessage(code, args, locale);
 	}
 
@@ -1291,8 +1295,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 */
 	@Nullable
 	protected MessageSource getInternalParentMessageSource() {
-		return (getParent() instanceof AbstractApplicationContext) ?
-			((AbstractApplicationContext) getParent()).messageSource : getParent();
+		return (getParent() instanceof AbstractApplicationContext ?
+			((AbstractApplicationContext) getParent()).messageSource : getParent());
 	}
 
 

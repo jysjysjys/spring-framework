@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,10 +42,10 @@ import org.springframework.lang.Nullable;
  * @since 2.0
  */
 @SuppressWarnings("serial")
-class InstantiationModelAwarePointcutAdvisorImpl
+final class InstantiationModelAwarePointcutAdvisorImpl
 		implements InstantiationModelAwarePointcutAdvisor, AspectJPrecedenceInformation, Serializable {
 
-	private static Advice EMPTY_ADVICE = new Advice() {};
+	private static final Advice EMPTY_ADVICE = new Advice() {};
 
 
 	private final AspectJExpressionPointcut declaredPointcut;
@@ -264,7 +264,7 @@ class InstantiationModelAwarePointcutAdvisorImpl
 	 * Note that this is a <i>dynamic</i> pointcut. Otherwise it might
 	 * be optimized out if it does not at first match statically.
 	 */
-	private class PerTargetInstantiationModelPointcut extends DynamicMethodMatcherPointcut {
+	private final class PerTargetInstantiationModelPointcut extends DynamicMethodMatcherPointcut {
 
 		private final AspectJExpressionPointcut declaredPointcut;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ import org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler;
  * <p>Registers a Spring MVC {@link org.springframework.web.servlet.HandlerMapping}
  * with order 1 to map HTTP WebSocket handshake requests from STOMP/WebSocket clients.
  *
- * <p>Registers the following {@link org.springframework.messaging.MessageChannel}s:
+ * <p>Registers the following {@link org.springframework.messaging.MessageChannel org.springframework.messaging.MessageChannels}:
  * <ul>
  * <li>"clientInboundChannel" for receiving messages from clients (e.g. WebSocket clients)
  * <li>"clientOutboundChannel" for sending messages to clients (e.g. WebSocket clients)
@@ -308,6 +308,9 @@ class MessageBrokerBeanDefinitionParser implements BeanDefinitionParser {
 			if (transportElem.hasAttribute("send-buffer-size")) {
 				handlerDef.getPropertyValues().add("sendBufferSizeLimit", transportElem.getAttribute("send-buffer-size"));
 			}
+			if (transportElem.hasAttribute("time-to-first-message")) {
+				handlerDef.getPropertyValues().add("timeToFirstMessage", transportElem.getAttribute("time-to-first-message"));
+			}
 			Element factoriesElement = DomUtils.getChildElementByTagName(transportElem, "decorator-factories");
 			if (factoriesElement != null) {
 				ManagedList<Object> factories = extractBeanSubElements(factoriesElement, context);
@@ -382,6 +385,10 @@ class MessageBrokerBeanDefinitionParser implements BeanDefinitionParser {
 			if (simpleBrokerElem.hasAttribute("heartbeat")) {
 				String heartbeatValue = simpleBrokerElem.getAttribute("heartbeat");
 				brokerDef.getPropertyValues().add("heartbeatValue", heartbeatValue);
+			}
+			if (simpleBrokerElem.hasAttribute("selector-header")) {
+				String headerName = simpleBrokerElem.getAttribute("selector-header");
+				brokerDef.getPropertyValues().add("selectorHeaderName", headerName);
 			}
 		}
 		else if (brokerRelayElem != null) {
@@ -656,7 +663,7 @@ class MessageBrokerBeanDefinitionParser implements BeanDefinitionParser {
 		context.registerComponent(new BeanComponentDefinition(beanDef, name));
 	}
 
-	private static class DecoratingFactoryBean implements FactoryBean<WebSocketHandler> {
+	private static final class DecoratingFactoryBean implements FactoryBean<WebSocketHandler> {
 
 		private final WebSocketHandler handler;
 

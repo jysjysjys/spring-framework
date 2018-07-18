@@ -27,11 +27,13 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpLog;
 import org.springframework.http.server.RequestPath;
 import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -42,7 +44,7 @@ import org.springframework.util.StringUtils;
  */
 public abstract class AbstractServerHttpRequest implements ServerHttpRequest {
 
-	private static final Log logger = LogFactory.getLog(ServerHttpRequest.class);
+	protected final Log logger = HttpLog.create(LogFactory.getLog(getClass()));
 
 	private static final Pattern QUERY_PATTERN = Pattern.compile("([^&=]+)(=?)([^&]+)?");
 
@@ -62,6 +64,12 @@ public abstract class AbstractServerHttpRequest implements ServerHttpRequest {
 	@Nullable
 	private SslInfo sslInfo;
 
+	@Nullable
+	private String id;
+
+	@Nullable
+	private String logPrefix;
+
 
 	/**
 	 * Constructor with the URI and headers for the request.
@@ -75,6 +83,26 @@ public abstract class AbstractServerHttpRequest implements ServerHttpRequest {
 		this.headers = HttpHeaders.readOnlyHttpHeaders(headers);
 	}
 
+
+	public String getId() {
+		if (this.id == null) {
+			this.id = initId();
+			if (this.id == null) {
+				this.id = ObjectUtils.getIdentityHexString(this);
+			}
+		}
+		return this.id;
+	}
+
+	/**
+	 * Obtain the request id to use, or {@code null} in which case the Object
+	 * identity of this request instance is used.
+	 * @since 5.1
+	 */
+	@Nullable
+	protected String initId() {
+		return null;
+	}
 
 	@Override
 	public URI getURI() {
@@ -129,8 +157,8 @@ public abstract class AbstractServerHttpRequest implements ServerHttpRequest {
 		}
 		catch (UnsupportedEncodingException ex) {
 			if (logger.isWarnEnabled()) {
-				logger.warn("Could not decode query param [" + value + "] as 'UTF-8'. " +
-						"Falling back on default encoding; exception message: " + ex.getMessage());
+				logger.warn(getLogPrefix() + "Could not decode query value [" + value + "] as 'UTF-8'. " +
+						"Falling back on default encoding: " + ex.getMessage());
 			}
 			return URLDecoder.decode(value);
 		}
@@ -178,5 +206,16 @@ public abstract class AbstractServerHttpRequest implements ServerHttpRequest {
 	 * use such as WebSocket upgrades in the spring-webflux module.
 	 */
 	public abstract <T> T getNativeRequest();
+
+	/**
+	 * For internal use in logging at the HTTP adapter layer.
+	 * @since 5.1
+	 */
+	String getLogPrefix() {
+		if (this.logPrefix == null) {
+			this.logPrefix = "[" + getId() + "] ";
+		}
+		return this.logPrefix;
+	}
 
 }

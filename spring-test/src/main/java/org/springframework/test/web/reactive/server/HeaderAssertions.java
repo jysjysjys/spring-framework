@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import static org.springframework.test.util.AssertionErrors.fail;
  *
  * @author Rossen Stoyanchev
  * @author Brian Clozel
+ * @author Sam Brannen
  * @since 5.0
  * @see WebTestClient.ResponseSpec#expectHeader()
  */
@@ -61,7 +62,7 @@ public class HeaderAssertions {
 	 * Expect a header with the given name whose first value matches the
 	 * provided regex pattern.
 	 * @param name the header name
-	 * @param pattern String pattern to pass to {@link Pattern#compile(String)}
+	 * @param pattern the String pattern to pass to {@link Pattern#compile(String)}
 	 */
 	public WebTestClient.ResponseSpec valueMatches(String name, String pattern) {
 		String value = getHeaders().getFirst(name);
@@ -71,6 +72,18 @@ public class HeaderAssertions {
 		boolean match = Pattern.compile(pattern).matcher(value).matches();
 		String message = getMessage(name) + "=[" + value + "] does not match [" + pattern + "]";
 		this.exchangeResult.assertWithDiagnostics(() -> assertTrue(message, match));
+		return this.responseSpec;
+	}
+
+	/**
+	 * Expect that the header with the given name is present.
+	 * @since 5.0.3
+	 */
+	public WebTestClient.ResponseSpec exists(String name) {
+		if (!getHeaders().containsKey(name)) {
+			String message = getMessage(name) + " does not exist";
+			this.exchangeResult.assertWithDiagnostics(() -> fail(message));
+		}
 		return this.responseSpec;
 	}
 
@@ -125,10 +138,9 @@ public class HeaderAssertions {
 	 */
 	public WebTestClient.ResponseSpec contentTypeCompatibleWith(MediaType mediaType) {
 		MediaType actual = getHeaders().getContentType();
-		String message = getMessage("Content-Type") + "=[" + actual.toString() + "]"
-				+ " is not compatible with [" + mediaType.toString() + "]";
+		String message = getMessage("Content-Type") + "=[" + actual + "] is not compatible with [" + mediaType + "]";
 		this.exchangeResult.assertWithDiagnostics(() ->
-				assertTrue(message, actual.isCompatibleWith(mediaType)));
+				assertTrue(message, (actual != null && actual.isCompatibleWith(mediaType))));
 		return this.responseSpec;
 	}
 

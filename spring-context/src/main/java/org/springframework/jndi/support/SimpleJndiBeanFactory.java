@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.jndi.support;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -63,10 +63,10 @@ public class SimpleJndiBeanFactory extends JndiLocatorSupport implements BeanFac
 	/** JNDI names of resources that are known to be shareable, i.e. can be cached */
 	private final Set<String> shareableResources = new HashSet<>();
 
-	/** Cache of shareable singleton objects: bean name --> bean instance */
+	/** Cache of shareable singleton objects: bean name to bean instance. */
 	private final Map<String, Object> singletonObjects = new HashMap<>();
 
-	/** Cache of the types of nonshareable resources: bean name --> bean type */
+	/** Cache of the types of nonshareable resources: bean name to bean type. */
 	private final Map<String, Class<?>> resourceTypes = new HashMap<>();
 
 
@@ -92,7 +92,7 @@ public class SimpleJndiBeanFactory extends JndiLocatorSupport implements BeanFac
 	 * (typically within the "java:comp/env/" namespace)
 	 */
 	public void setShareableResources(String... shareableResources) {
-		this.shareableResources.addAll(Arrays.asList(shareableResources));
+		Collections.addAll(this.shareableResources, shareableResources);
 	}
 
 

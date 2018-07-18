@@ -227,6 +227,16 @@ public class MockHttpServletResponseTests {
 		assertEquals(1, response.getContentAsByteArray().length);
 	}
 
+	@Test // SPR-16683
+	public void servletWriterCommittedOnWriterClose() throws IOException {
+		assertFalse(response.isCommitted());
+		response.getWriter().write("X");
+		assertFalse(response.isCommitted());
+		response.getWriter().close();
+		assertTrue(response.isCommitted());
+		assertEquals(1, response.getContentAsByteArray().length);
+	}
+
 	@Test
 	public void servletWriterAutoFlushedForString() throws IOException {
 		response.getWriter().write("X");
@@ -301,7 +311,7 @@ public class MockHttpServletResponseTests {
 	public void modifyStatusAfterSendError() throws IOException {
 		response.sendError(HttpServletResponse.SC_NOT_FOUND);
 		response.setStatus(HttpServletResponse.SC_OK);
-		assertEquals(response.getStatus(),HttpServletResponse.SC_NOT_FOUND);
+		assertEquals(HttpServletResponse.SC_NOT_FOUND, response.getStatus());
 	}
 
 	@Test  // SPR-10414
@@ -309,7 +319,7 @@ public class MockHttpServletResponseTests {
 	public void modifyStatusMessageAfterSendError() throws IOException {
 		response.sendError(HttpServletResponse.SC_NOT_FOUND);
 		response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,"Server Error");
-		assertEquals(response.getStatus(),HttpServletResponse.SC_NOT_FOUND);
+		assertEquals(HttpServletResponse.SC_NOT_FOUND, response.getStatus());
 	}
 
 }

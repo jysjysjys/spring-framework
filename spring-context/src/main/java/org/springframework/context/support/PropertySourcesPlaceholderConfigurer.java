@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -170,13 +170,13 @@ public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerS
 		propertyResolver.setValueSeparator(this.valueSeparator);
 
 		StringValueResolver valueResolver = strVal -> {
-			String resolved = (ignoreUnresolvablePlaceholders ?
+			String resolved = (this.ignoreUnresolvablePlaceholders ?
 					propertyResolver.resolvePlaceholders(strVal) :
 					propertyResolver.resolveRequiredPlaceholders(strVal));
-			if (trimValues) {
+			if (this.trimValues) {
 				resolved = resolved.trim();
 			}
-			return (resolved.equals(nullValue) ? null : resolved);
+			return (resolved.equals(this.nullValue) ? null : resolved);
 		};
 
 		doProcessProperties(beanFactoryToProcess, valueResolver);
@@ -185,7 +185,7 @@ public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerS
 	/**
 	 * Implemented for compatibility with {@link org.springframework.beans.factory.config.PlaceholderConfigurerSupport}.
 	 * @deprecated in favor of {@link #processProperties(ConfigurableListableBeanFactory, ConfigurablePropertyResolver)}
-	 * @throws UnsupportedOperationException
+	 * @throws UnsupportedOperationException in this implementation
 	 */
 	@Override
 	@Deprecated

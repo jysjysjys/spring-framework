@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanNameAware;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
@@ -150,6 +151,35 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		assertEquals(2, depBeans.length);
 		assertEquals("testBean", depBeans[0]);
 		assertEquals("nestedTestBean", depBeans[1]);
+	}
+
+	@Test
+	public void testExtendedResourceInjectionWithDestruction() {
+		DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
+		bf.registerResolvableDependency(BeanFactory.class, bf);
+		AutowiredAnnotationBeanPostProcessor bpp = new AutowiredAnnotationBeanPostProcessor();
+		bpp.setBeanFactory(bf);
+		bf.addBeanPostProcessor(bpp);
+		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(TypedExtendedResourceInjectionBean.class));
+		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
+		NestedTestBean ntb = new NestedTestBean();
+		bf.registerSingleton("nestedTestBean", ntb);
+
+		TestBean tb = bf.getBean("testBean", TestBean.class);
+		TypedExtendedResourceInjectionBean bean = (TypedExtendedResourceInjectionBean) bf.getBean("annotatedBean");
+		assertSame(tb, bean.getTestBean());
+		assertSame(tb, bean.getTestBean2());
+		assertSame(tb, bean.getTestBean3());
+		assertSame(tb, bean.getTestBean4());
+		assertSame(ntb, bean.getNestedTestBean());
+		assertSame(bf, bean.getBeanFactory());
+
+		assertArrayEquals(new String[] {"testBean", "nestedTestBean"}, bf.getDependenciesForBean("annotatedBean"));
+		bf.destroySingleton("testBean");
+		assertFalse(bf.containsSingleton("testBean"));
+		assertFalse(bf.containsSingleton("annotatedBean"));
+		assertTrue(bean.destroyed);
+		assertSame(0, bf.getDependenciesForBean("annotatedBean").length);
 	}
 
 	@Test
@@ -698,9 +728,8 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		ConstructorsCollectionResourceInjectionBean bean = (ConstructorsCollectionResourceInjectionBean) bf.getBean("annotatedBean");
 		assertNull(bean.getTestBean3());
 		assertSame(tb, bean.getTestBean4());
-		assertEquals(2, bean.getNestedTestBeans().size());
-		assertNull(bean.getNestedTestBeans().get(0));
-		assertSame(ntb2, bean.getNestedTestBeans().get(1));
+		assertEquals(1, bean.getNestedTestBeans().size());
+		assertSame(ntb2, bean.getNestedTestBeans().get(0));
 
 		Map<String, NestedTestBean> map = bf.getBeansOfType(NestedTestBean.class);
 		assertNull(map.get("nestedTestBean1"));
@@ -894,12 +923,12 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerBeanDefinition("testBean2", tb2);
 
 		MapConstructorInjectionBean bean = (MapConstructorInjectionBean) bf.getBean("annotatedBean");
-		assertEquals(2, bean.getTestBeanMap().size());
+		assertEquals(1, bean.getTestBeanMap().size());
 		assertSame(tb1, bean.getTestBeanMap().get("testBean1"));
 		assertNull(bean.getTestBeanMap().get("testBean2"));
 
 		bean = (MapConstructorInjectionBean) bf.getBean("annotatedBean");
-		assertEquals(2, bean.getTestBeanMap().size());
+		assertEquals(1, bean.getTestBeanMap().size());
 		assertSame(tb1, bean.getTestBeanMap().get("testBean1"));
 		assertNull(bean.getTestBeanMap().get("testBean2"));
 	}
@@ -1285,9 +1314,6 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		assertSame(bf.getBean("dependencyBean"), bean.getTestBean());
 		bf.destroySingletons();
 	}
-
-	@Qualifier("testBean")
-	private void testBeanQualifierProvider() {}
 
 	@Test
 	public void testObjectFactorySerialization() throws Exception {
@@ -2336,6 +2362,7 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		GenericInterface1Impl bean1 = (GenericInterface1Impl) bf.getBean("bean1");
 		GenericInterface2Impl bean2 = (GenericInterface2Impl) bf.getBean("bean2");
 		assertSame(bean2, bean1.gi2);
+		assertEquals(ResolvableType.forClass(GenericInterface1Impl.class), bd.getResolvableType());
 	}
 
 	@Test
@@ -2354,6 +2381,7 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		GenericInterface1Impl bean1 = (GenericInterface1Impl) bf.getBean("bean1");
 		GenericInterface2Impl bean2 = (GenericInterface2Impl) bf.getBean("bean2");
 		assertSame(bean2, bean1.gi2);
+		assertEquals(ResolvableType.forClass(GenericInterface1Impl.class), bd.getResolvableType());
 	}
 
 	@Test
@@ -2374,7 +2402,6 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		GenericInterface1Impl bean1 = (GenericInterface1Impl) bf.getBean("bean1");
 		GenericInterface2Impl bean2 = (GenericInterface2Impl) bf.getBean("bean2");
 		assertSame(bean2, bean1.gi2);
-
 		assertArrayEquals(new String[] {"bean1"}, bf.getBeanNamesForType(ResolvableType.forClassWithGenerics(GenericInterface1.class, String.class)));
 		assertArrayEquals(new String[] {"bean2"}, bf.getBeanNamesForType(ResolvableType.forClassWithGenerics(GenericInterface2.class, String.class)));
 	}
@@ -2401,7 +2428,7 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	public void testGenericsBasedInjectionWithBeanDefinitionTargetResolvableType() throws Exception {
+	public void testGenericsBasedInjectionWithBeanDefinitionTargetResolvableType() {
 		DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
 		bf.setAutowireCandidateResolver(new QualifierAnnotationAutowireCandidateResolver());
 		AutowiredAnnotationBeanPostProcessor bpp = new AutowiredAnnotationBeanPostProcessor();
@@ -2416,6 +2443,8 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerBeanDefinition("bean3", new RootBeanDefinition(MultiGenericFieldInjection.class));
 
 		assertEquals("bean1 a bean2 123", bf.getBean("bean3").toString());
+		assertEquals(ResolvableType.forClassWithGenerics(GenericInterface2Bean.class, String.class), bd1.getResolvableType());
+		assertEquals(ResolvableType.forClassWithGenerics(GenericInterface2Bean.class, Integer.class), bd2.getResolvableType());
 	}
 
 	@Test
@@ -2493,6 +2522,9 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		assertSame(bf.getBean("annotatedBean"), bean.testBean);
 	}
 
+
+	@Qualifier("testBean")
+	private void testBeanQualifierProvider() {}
 
 	@Qualifier("integerRepo")
 	private Repository<?> integerRepositoryQualifierProvider;
@@ -2579,7 +2611,15 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 	}
 
 
-	public static class TypedExtendedResourceInjectionBean extends NonPublicResourceInjectionBean<NestedTestBean> {
+	public static class TypedExtendedResourceInjectionBean extends NonPublicResourceInjectionBean<NestedTestBean>
+			implements DisposableBean {
+
+		public boolean destroyed = false;
+
+		@Override
+		public void destroy() {
+			this.destroyed = true;
+		}
 	}
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ import org.springframework.util.StringUtils;
  */
 public class StaticListableBeanFactory implements ListableBeanFactory {
 
-	/** Map from bean name to bean instance */
+	/** Map from bean name to bean instance. */
 	private final Map<String, Object> beans;
 
 
@@ -338,7 +338,7 @@ public class StaticListableBeanFactory implements ListableBeanFactory {
 				results.add(beanName);
 			}
 		}
-		return results.toArray(new String[results.size()]);
+		return StringUtils.toStringArray(results);
 	}
 
 	@Override

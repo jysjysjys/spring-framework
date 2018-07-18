@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,8 +39,9 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.util.xml.SimpleNamespaceContext;
 
-import static org.hamcrest.MatcherAssert.*;
-import static org.springframework.test.util.AssertionErrors.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.springframework.test.util.AssertionErrors.assertEquals;
+import static org.springframework.test.util.AssertionErrors.assertTrue;
 
 /**
  * A helper class for applying assertions via XPath expressions.
@@ -60,10 +61,10 @@ public class XpathExpectationsHelper {
 	/**
 	 * XpathExpectationsHelper constructor.
 	 * @param expression the XPath expression
-	 * @param namespaces XML namespaces referenced in the XPath expression, or {@code null}
+	 * @param namespaces the XML namespaces referenced in the XPath expression, or {@code null}
 	 * @param args arguments to parameterize the XPath expression with using the
 	 * formatting specifiers defined in {@link String#format(String, Object...)}
-	 * @throws XPathExpressionException
+	 * @throws XPathExpressionException if expression compilation failed
 	 */
 	public XpathExpectationsHelper(String expression, @Nullable Map<String, String> namespaces, Object... args)
 			throws XPathExpressionException {
@@ -78,7 +79,7 @@ public class XpathExpectationsHelper {
 			throws XPathExpressionException {
 
 		SimpleNamespaceContext namespaceContext = new SimpleNamespaceContext();
-		namespaceContext.setBindings((namespaces != null) ? namespaces : Collections.<String, String> emptyMap());
+		namespaceContext.setBindings(namespaces != null ? namespaces : Collections.emptyMap());
 		XPath xpath = XPathFactory.newInstance().newXPath();
 		xpath.setNamespaceContext(namespaceContext);
 		return xpath.compile(expression);
@@ -122,7 +123,7 @@ public class XpathExpectationsHelper {
 
 	/**
 	 * Apply the XPath expression to given document.
-	 * @throws XPathExpressionException
+	 * @throws XPathExpressionException if expression evaluation failed
 	 */
 	@SuppressWarnings("unchecked")
 	@Nullable
