@@ -30,7 +30,7 @@ import org.springframework.core.codec.Encoder;
 import org.springframework.core.codec.Hints;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpLog;
+import org.springframework.http.HttpLogging;
 import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpOutputMessage;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -48,6 +48,7 @@ import org.springframework.util.Assert;
  * @author Arjen Poutsma
  * @author Sebastien Deleuze
  * @author Rossen Stoyanchev
+ * @author Brian Clozel
  * @since 5.0
  * @param <T> the type of objects in the input stream
  */
@@ -76,7 +77,7 @@ public class EncoderHttpMessageWriter<T> implements HttpMessageWriter<T> {
 		if (encoder instanceof AbstractEncoder &&
 				encoder.getClass().getPackage().getName().startsWith("org.springframework.core.codec")) {
 
-			Log logger = HttpLog.create(((AbstractEncoder) encoder).getLogger());
+			Log logger = HttpLogging.forLog(((AbstractEncoder) encoder).getLogger());
 			((AbstractEncoder) encoder).setLogger(logger);
 		}
 	}
@@ -119,9 +120,10 @@ public class EncoderHttpMessageWriter<T> implements HttpMessageWriter<T> {
 			HttpHeaders headers = message.getHeaders();
 			if (headers.getContentLength() < 0 && !headers.containsKey(HttpHeaders.TRANSFER_ENCODING)) {
 				return Mono.from(body)
-						.flatMap(dataBuffer -> {
-							headers.setContentLength(dataBuffer.readableByteCount());
-							return message.writeWith(Mono.just(dataBuffer));
+						.defaultIfEmpty(message.bufferFactory().wrap(new byte[0]))
+						.flatMap(buffer -> {
+							headers.setContentLength(buffer.readableByteCount());
+							return message.writeWith(Mono.just(buffer));
 						});
 			}
 		}
@@ -160,7 +162,8 @@ public class EncoderHttpMessageWriter<T> implements HttpMessageWriter<T> {
 	private boolean isStreamingMediaType(@Nullable MediaType contentType) {
 		return (contentType != null && this.encoder instanceof HttpMessageEncoder &&
 				((HttpMessageEncoder<?>) this.encoder).getStreamingMediaTypes().stream()
-						.anyMatch(contentType::isCompatibleWith));
+						.anyMatch(streamingMediaType -> contentType.isCompatibleWith(streamingMediaType) &&
+								contentType.getParameters().entrySet().containsAll(streamingMediaType.getParameters().keySet())));
 	}
 
 

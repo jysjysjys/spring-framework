@@ -207,7 +207,7 @@ public class SchedulerFactoryBean extends SchedulerAccessor implements FactoryBe
 
 	private int startupDelay = 0;
 
-	private int phase = Integer.MAX_VALUE;
+	private int phase = DEFAULT_PHASE;
 
 	private boolean exposeSchedulerInRepository = false;
 
@@ -294,7 +294,7 @@ public class SchedulerFactoryBean extends SchedulerAccessor implements FactoryBe
 	 * @see #setQuartzProperties
 	 * @see LocalTaskExecutorThreadPool
 	 * @see org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
-	 * @see org.springframework.scheduling.commonj.WorkManagerTaskExecutor
+	 * @see org.springframework.scheduling.concurrent.DefaultManagedTaskExecutor
 	 */
 	public void setTaskExecutor(Executor taskExecutor) {
 		this.taskExecutor = taskExecutor;
@@ -556,8 +556,8 @@ public class SchedulerFactoryBean extends SchedulerAccessor implements FactoryBe
 		}
 
 		if (this.configLocation != null) {
-			if (logger.isInfoEnabled()) {
-				logger.info("Loading Quartz config from [" + this.configLocation + "]");
+			if (logger.isDebugEnabled()) {
+				logger.debug("Loading Quartz config from [" + this.configLocation + "]");
 			}
 			PropertiesLoaderUtils.fillProperties(mergedProps, this.configLocation);
 		}
@@ -717,7 +717,7 @@ public class SchedulerFactoryBean extends SchedulerAccessor implements FactoryBe
 				@Override
 				public void run() {
 					try {
-						Thread.sleep(TimeUnit.SECONDS.toMillis(startupDelay));
+						TimeUnit.SECONDS.sleep(startupDelay);
 					}
 					catch (InterruptedException ex) {
 						Thread.currentThread().interrupt();
@@ -794,12 +794,6 @@ public class SchedulerFactoryBean extends SchedulerAccessor implements FactoryBe
 				throw new SchedulingException("Could not stop Quartz Scheduler", ex);
 			}
 		}
-	}
-
-	@Override
-	public void stop(Runnable callback) throws SchedulingException {
-		stop();
-		callback.run();
 	}
 
 	@Override

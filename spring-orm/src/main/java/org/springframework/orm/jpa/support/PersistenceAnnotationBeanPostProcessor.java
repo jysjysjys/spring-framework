@@ -22,7 +22,9 @@ import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -333,6 +335,11 @@ public class PersistenceAnnotationBeanPostProcessor
 	}
 
 	@Override
+	public void resetBeanDefinition(String beanName) {
+		this.injectionMetadataCache.remove(beanName);
+	}
+
+	@Override
 	public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
 		return null;
 	}
@@ -405,7 +412,7 @@ public class PersistenceAnnotationBeanPostProcessor
 	}
 
 	private InjectionMetadata buildPersistenceMetadata(final Class<?> clazz) {
-		LinkedList<InjectionMetadata.InjectedElement> elements = new LinkedList<>();
+		List<InjectionMetadata.InjectedElement> elements = new ArrayList<>();
 		Class<?> targetClass = clazz;
 
 		do {
@@ -461,7 +468,7 @@ public class PersistenceAnnotationBeanPostProcessor
 	protected EntityManagerFactory getPersistenceUnit(@Nullable String unitName) {
 		if (this.persistenceUnits != null) {
 			String unitNameForLookup = (unitName != null ? unitName : "");
-			if ("".equals(unitNameForLookup)) {
+			if (unitNameForLookup.isEmpty()) {
 				unitNameForLookup = this.defaultPersistenceUnitName;
 			}
 			String jndiName = this.persistenceUnits.get(unitNameForLookup);
@@ -494,7 +501,7 @@ public class PersistenceAnnotationBeanPostProcessor
 		Map<String, String> contexts = (extended ? this.extendedPersistenceContexts : this.persistenceContexts);
 		if (contexts != null) {
 			String unitNameForLookup = (unitName != null ? unitName : "");
-			if ("".equals(unitNameForLookup)) {
+			if (unitNameForLookup.isEmpty()) {
 				unitNameForLookup = this.defaultPersistenceUnitName;
 			}
 			String jndiName = contexts.get(unitNameForLookup);
@@ -526,10 +533,10 @@ public class PersistenceAnnotationBeanPostProcessor
 			throws NoSuchBeanDefinitionException {
 
 		String unitNameForLookup = (unitName != null ? unitName : "");
-		if ("".equals(unitNameForLookup)) {
+		if (unitNameForLookup.isEmpty()) {
 			unitNameForLookup = this.defaultPersistenceUnitName;
 		}
-		if (!"".equals(unitNameForLookup)) {
+		if (!unitNameForLookup.isEmpty()) {
 			return findNamedEntityManagerFactory(unitNameForLookup, requestingBeanName);
 		}
 		else {

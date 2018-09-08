@@ -35,6 +35,7 @@ import io.netty.buffer.ByteBuf;
 import org.junit.Test;
 import org.mockito.stubbing.Answer;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.springframework.core.io.ClassPathResource;
@@ -225,24 +226,37 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 	}
 
 	@Test
-	public void takeUntilByteCount() throws Exception {
-		DataBuffer foo = stringBuffer("foo");
-		DataBuffer bar = stringBuffer("bar");
-		DataBuffer baz = stringBuffer("baz");
-		Flux<DataBuffer> flux = Flux.just(foo, bar, baz);
-		Flux<DataBuffer> result = DataBufferUtils.takeUntilByteCount(flux, 5L);
+	public void takeUntilByteCount() {
+
+		Flux<DataBuffer> result = DataBufferUtils.takeUntilByteCount(
+				Flux.just(stringBuffer("foo"), stringBuffer("bar")), 5L);
 
 		StepVerifier.create(result)
 				.consumeNextWith(stringConsumer("foo"))
 				.consumeNextWith(stringConsumer("ba"))
 				.expectComplete()
 				.verify(Duration.ofSeconds(5));
-
-		release(baz);
 	}
 
 	@Test
-	public void skipUntilByteCount() throws Exception {
+	public void takeUntilByteCountExact() {
+
+		DataBuffer extraBuffer = stringBuffer("baz");
+
+		Flux<DataBuffer> result = DataBufferUtils.takeUntilByteCount(
+				Flux.just(stringBuffer("foo"), stringBuffer("bar"), extraBuffer), 6L);
+
+		StepVerifier.create(result)
+				.consumeNextWith(stringConsumer("foo"))
+				.consumeNextWith(stringConsumer("bar"))
+				.expectComplete()
+				.verify(Duration.ofSeconds(5));
+
+		release(extraBuffer);
+	}
+
+	@Test
+	public void skipUntilByteCount() {
 		DataBuffer foo = stringBuffer("foo");
 		DataBuffer bar = stringBuffer("bar");
 		DataBuffer baz = stringBuffer("baz");
@@ -257,7 +271,7 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 	}
 
 	@Test
-	public void skipUntilByteCountShouldSkipAll() throws Exception {
+	public void skipUntilByteCountShouldSkipAll() {
 		DataBuffer foo = stringBuffer("foo");
 		DataBuffer bar = stringBuffer("bar");
 		DataBuffer baz = stringBuffer("baz");
@@ -325,12 +339,26 @@ public class DataBufferUtilsTests extends AbstractDataBufferAllocatingTestCase {
 		DataBuffer bar = stringBuffer("bar");
 		DataBuffer baz = stringBuffer("baz");
 		Flux<DataBuffer> flux = Flux.just(foo, bar, baz);
+		Mono<DataBuffer> result = DataBufferUtils.join(flux);
 
-		DataBuffer result = DataBufferUtils.join(flux).block(Duration.ofSeconds(5));
+		StepVerifier.create(result)
+				.consumeNextWith(dataBuffer -> {
+					assertEquals("foobarbaz", DataBufferTestUtils.dumpString(dataBuffer, StandardCharsets.UTF_8));
+							release(dataBuffer);
+						})
+				.verifyComplete();
+	}
 
-		assertEquals("foobarbaz", DataBufferTestUtils.dumpString(result, StandardCharsets.UTF_8));
+	@Test
+	public void joinErrors() {
+		DataBuffer foo = stringBuffer("foo");
+		DataBuffer bar = stringBuffer("bar");
+		Flux<DataBuffer> flux = Flux.just(foo, bar).mergeWith(Flux.error(new RuntimeException()));
+		Mono<DataBuffer> result = DataBufferUtils.join(flux);
 
-		release(result);
+		StepVerifier.create(result)
+				.expectError(RuntimeException.class)
+				.verify();
 	}
 
 }

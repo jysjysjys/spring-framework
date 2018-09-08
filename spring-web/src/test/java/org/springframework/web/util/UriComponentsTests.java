@@ -24,12 +24,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.junit.Test;
-
-import org.springframework.web.util.UriComponents.UriTemplateVariables;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -70,19 +66,18 @@ public class UriComponentsTests {
 	@Test
 	public void encodeAndExpandPartially() {
 
-		Map<String, Object> uriVars = new HashMap<>();
-		uriVars.put("city", "Z\u00fcrich");
-
 		UriComponents uri = UriComponentsBuilder
-				.fromPath("/hotel list/{city} specials").queryParam("q", "{value}").encode().build()
-				.expand(name -> uriVars.getOrDefault(name, UriTemplateVariables.SKIP_VALUE));
+				.fromPath("/hotel list/{city} specials").queryParam("q", "{value}").encode()
+				.uriVariables(Collections.singletonMap("city", "Z\u00fcrich"))
+				.build();
 
-		assertEquals("/hotel%20list/Z%C3%BCrich%20specials?q={value}", uri.toString());
+		assertEquals("/hotel%20list/Z%C3%BCrich%20specials?q=a%2Bb", uri.expand("a+b").toString());
+	}
 
-		uriVars.put("value", "a+b");
-		uri = uri.expand(uriVars);
-
-		assertEquals("/hotel%20list/Z%C3%BCrich%20specials?q=a%2Bb", uri.toString());
+	@Test // SPR-17168
+	public void encodeAndExpandWithDollarSign() {
+		UriComponents uri = UriComponentsBuilder.fromPath("/path").queryParam("q", "{value}").encode().build();
+		assertEquals("/path?q=JavaClass%241.class", uri.expand("JavaClass$1.class").toString());
 	}
 
 	@Test

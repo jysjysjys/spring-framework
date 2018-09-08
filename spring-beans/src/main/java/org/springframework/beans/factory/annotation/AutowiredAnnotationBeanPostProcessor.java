@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -121,7 +120,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	private final Set<Class<? extends Annotation>> autowiredAnnotationTypes = new LinkedHashSet<>();
+	private final Set<Class<? extends Annotation>> autowiredAnnotationTypes = new LinkedHashSet<>(4);
 
 	private String requiredParameterName = "required";
 
@@ -151,7 +150,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 		try {
 			this.autowiredAnnotationTypes.add((Class<? extends Annotation>)
 					ClassUtils.forName("javax.inject.Inject", AutowiredAnnotationBeanPostProcessor.class.getClassLoader()));
-			logger.info("JSR-330 'javax.inject.Inject' annotation found and supported for autowiring");
+			logger.trace("JSR-330 'javax.inject.Inject' annotation found and supported for autowiring");
 		}
 		catch (ClassNotFoundException ex) {
 			// JSR-330 API not available - simply skip.
@@ -235,6 +234,12 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 	}
 
 	@Override
+	public void resetBeanDefinition(String beanName) {
+		this.lookupMethodsChecked.remove(beanName);
+		this.injectionMetadataCache.remove(beanName);
+	}
+
+	@Override
 	@Nullable
 	public Constructor<?>[] determineCandidateConstructors(Class<?> beanClass, final String beanName)
 			throws BeanCreationException {
@@ -253,7 +258,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 						}
 						catch (NoSuchBeanDefinitionException ex) {
 							throw new BeanCreationException(beanName,
-								"Cannot apply @Lookup to beans without corresponding bean definition");
+									"Cannot apply @Lookup to beans without corresponding bean definition");
 						}
 					}
 				});
@@ -335,8 +340,8 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 							if (defaultConstructor != null) {
 								candidates.add(defaultConstructor);
 							}
-							else if (candidates.size() == 1 && logger.isWarnEnabled()) {
-								logger.warn("Inconsistent constructor declaration on bean with name '" + beanName +
+							else if (candidates.size() == 1 && logger.isInfoEnabled()) {
+								logger.info("Inconsistent constructor declaration on bean with name '" + beanName +
 										"': single autowire-marked constructor flagged as optional - " +
 										"this constructor is effectively required since there is no " +
 										"default constructor to fall back to: " + candidates.get(0));
@@ -347,8 +352,8 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 					else if (rawCandidates.length == 1 && rawCandidates[0].getParameterCount() > 0) {
 						candidateConstructors = new Constructor<?>[] {rawCandidates[0]};
 					}
-					else if (nonSyntheticConstructors == 2 && primaryConstructor != null
-							&& defaultConstructor != null && !primaryConstructor.equals(defaultConstructor)) {
+					else if (nonSyntheticConstructors == 2 && primaryConstructor != null &&
+							defaultConstructor != null && !primaryConstructor.equals(defaultConstructor)) {
 						candidateConstructors = new Constructor<?>[] {primaryConstructor, defaultConstructor};
 					}
 					else if (nonSyntheticConstructors == 1 && primaryConstructor != null) {
@@ -430,18 +435,18 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 	}
 
 	private InjectionMetadata buildAutowiringMetadata(final Class<?> clazz) {
-		LinkedList<InjectionMetadata.InjectedElement> elements = new LinkedList<>();
+		List<InjectionMetadata.InjectedElement> elements = new ArrayList<>();
 		Class<?> targetClass = clazz;
 
 		do {
-			final LinkedList<InjectionMetadata.InjectedElement> currElements = new LinkedList<>();
+			final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
 
 			ReflectionUtils.doWithLocalFields(targetClass, field -> {
 				AnnotationAttributes ann = findAutowiredAnnotation(field);
 				if (ann != null) {
 					if (Modifier.isStatic(field.getModifiers())) {
-						if (logger.isWarnEnabled()) {
-							logger.warn("Autowired annotation is not supported on static fields: " + field);
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation is not supported on static fields: " + field);
 						}
 						return;
 					}
@@ -458,14 +463,14 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 				AnnotationAttributes ann = findAutowiredAnnotation(bridgedMethod);
 				if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, clazz))) {
 					if (Modifier.isStatic(method.getModifiers())) {
-						if (logger.isWarnEnabled()) {
-							logger.warn("Autowired annotation is not supported on static methods: " + method);
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation is not supported on static methods: " + method);
 						}
 						return;
 					}
 					if (method.getParameterCount() == 0) {
-						if (logger.isWarnEnabled()) {
-							logger.warn("Autowired annotation should only be used on methods with parameters: " +
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation should only be used on methods with parameters: " +
 									method);
 						}
 					}
@@ -485,7 +490,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 
 	@Nullable
 	private AnnotationAttributes findAutowiredAnnotation(AccessibleObject ao) {
-		if (ao.getAnnotations().length > 0) {
+		if (ao.getAnnotations().length > 0) {  // autowiring annotations have to be local
 			for (Class<? extends Annotation> type : this.autowiredAnnotationTypes) {
 				AnnotationAttributes attributes = AnnotatedElementUtils.getMergedAnnotationAttributes(ao, type);
 				if (attributes != null) {
@@ -532,8 +537,8 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 				if (this.beanFactory != null && this.beanFactory.containsBean(autowiredBeanName)) {
 					this.beanFactory.registerDependentBean(autowiredBeanName, beanName);
 				}
-				if (logger.isDebugEnabled()) {
-					logger.debug("Autowiring by type from bean name '" + beanName +
+				if (logger.isTraceEnabled()) {
+					logger.trace("Autowiring by type from bean name '" + beanName +
 							"' to bean named '" + autowiredBeanName + "'");
 				}
 			}

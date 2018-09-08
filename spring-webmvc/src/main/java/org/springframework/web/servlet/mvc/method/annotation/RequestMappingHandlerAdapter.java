@@ -36,8 +36,8 @@ import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.core.ReactiveAdapterRegistry;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.http.converter.ByteArrayHttpMessageConverter;
@@ -114,6 +114,20 @@ import org.springframework.web.util.WebUtils;
 public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 		implements BeanFactoryAware, InitializingBean {
 
+	/**
+	 * MethodFilter that matches {@link InitBinder @InitBinder} methods.
+	 */
+	public static final MethodFilter INIT_BINDER_METHODS = method ->
+			AnnotatedElementUtils.hasAnnotation(method, InitBinder.class);
+
+	/**
+	 * MethodFilter that matches {@link ModelAttribute @ModelAttribute} methods.
+	 */
+	public static final MethodFilter MODEL_ATTRIBUTE_METHODS = method ->
+			(!AnnotatedElementUtils.hasAnnotation(method, RequestMapping.class) &&
+					AnnotatedElementUtils.hasAnnotation(method, ModelAttribute.class));
+
+
 	@Nullable
 	private List<HandlerMethodArgumentResolver> customArgumentResolvers;
 
@@ -184,7 +198,12 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 		this.messageConverters = new ArrayList<>(4);
 		this.messageConverters.add(new ByteArrayHttpMessageConverter());
 		this.messageConverters.add(stringHttpMessageConverter);
-		this.messageConverters.add(new SourceHttpMessageConverter<>());
+		try {
+			this.messageConverters.add(new SourceHttpMessageConverter<>());
+		}
+		catch (Error err) {
+			// Ignore when no TransformerFactory implementation is available
+		}
 		this.messageConverters.add(new AllEncompassingFormHttpMessageConverter());
 	}
 
@@ -866,8 +885,8 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 				mavContainer = (ModelAndViewContainer) asyncManager.getConcurrentResultContext()[0];
 				asyncManager.clearConcurrentResult();
 				if (logger.isDebugEnabled()) {
-					logger.debug("Resume with async result [" +
-							(result instanceof CharSequence ? "\"" + result + "\"" :  result) + "]");
+					String formatted = AbstractMessageConverterMethodProcessor.formatValue(result);
+					logger.debug("Resume with async result [" + formatted + "]");
 				}
 				invocableMethod = invocableMethod.wrapConcurrentResult(result);
 			}
@@ -999,19 +1018,5 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 		}
 		return mav;
 	}
-
-
-	/**
-	 * MethodFilter that matches {@link InitBinder @InitBinder} methods.
-	 */
-	public static final MethodFilter INIT_BINDER_METHODS = method ->
-			AnnotationUtils.findAnnotation(method, InitBinder.class) != null;
-
-	/**
-	 * MethodFilter that matches {@link ModelAttribute @ModelAttribute} methods.
-	 */
-	public static final MethodFilter MODEL_ATTRIBUTE_METHODS = method ->
-			((AnnotationUtils.findAnnotation(method, RequestMapping.class) == null) &&
-			(AnnotationUtils.findAnnotation(method, ModelAttribute.class) != null));
 
 }

@@ -40,7 +40,11 @@ import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 
 /**
- * Encode from {@code Object} stream to a byte stream containing XML elements.
+ * Encode from single value to a byte stream containing XML elements.
+ *
+ * <p>{@link javax.xml.bind.annotation.XmlElements @XmlElements} and
+ * {@link javax.xml.bind.annotation.XmlElement @XmlElement} can be used to specify how
+ * collections should be marshalled.
  *
  * @author Sebastien Deleuze
  * @author Arjen Poutsma
@@ -60,7 +64,7 @@ public class Jaxb2XmlEncoder extends AbstractSingleValueEncoder<Object> {
 	@Override
 	public boolean canEncode(ResolvableType elementType, @Nullable MimeType mimeType) {
 		if (super.canEncode(elementType, mimeType)) {
-			Class<?> outputClass = elementType.resolve(Object.class);
+			Class<?> outputClass = elementType.toClass();
 			return (outputClass.isAnnotationPresent(XmlRootElement.class) ||
 					outputClass.isAnnotationPresent(XmlType.class));
 		}

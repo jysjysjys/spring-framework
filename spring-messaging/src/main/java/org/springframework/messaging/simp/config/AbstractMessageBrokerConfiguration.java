@@ -27,6 +27,7 @@ import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.event.SmartApplicationListener;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.converter.ByteArrayMessageConverter;
@@ -37,6 +38,7 @@ import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.converter.StringMessageConverter;
 import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
 import org.springframework.messaging.handler.invocation.HandlerMethodReturnValueHandler;
+import org.springframework.messaging.simp.SimpLogging;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.support.SimpAnnotationMethodMessageHandler;
 import org.springframework.messaging.simp.broker.AbstractBrokerMessageHandler;
@@ -125,6 +127,7 @@ public abstract class AbstractMessageBrokerConfiguration implements ApplicationC
 	@Bean
 	public AbstractSubscribableChannel clientInboundChannel() {
 		ExecutorSubscribableChannel channel = new ExecutorSubscribableChannel(clientInboundChannelExecutor());
+		channel.setLogger(SimpLogging.forLog(channel.getLogger()));
 		ChannelRegistration reg = getClientInboundChannelRegistration();
 		if (reg.hasInterceptors()) {
 			channel.setInterceptors(reg.getInterceptors());
@@ -160,6 +163,7 @@ public abstract class AbstractMessageBrokerConfiguration implements ApplicationC
 	@Bean
 	public AbstractSubscribableChannel clientOutboundChannel() {
 		ExecutorSubscribableChannel channel = new ExecutorSubscribableChannel(clientOutboundChannelExecutor());
+		channel.setLogger(SimpLogging.forLog(channel.getLogger()));
 		ChannelRegistration reg = getClientOutboundChannelRegistration();
 		if (reg.hasInterceptors()) {
 			channel.setInterceptors(reg.getInterceptors());
@@ -198,6 +202,7 @@ public abstract class AbstractMessageBrokerConfiguration implements ApplicationC
 		ExecutorSubscribableChannel channel = (reg.hasTaskExecutor() ?
 				new ExecutorSubscribableChannel(brokerChannelExecutor()) : new ExecutorSubscribableChannel());
 		reg.interceptors(new ImmutableMessageChannelInterceptor());
+		channel.setLogger(SimpLogging.forLog(channel.getLogger()));
 		channel.setInterceptors(reg.getInterceptors());
 		return channel;
 	}
@@ -313,7 +318,7 @@ public abstract class AbstractMessageBrokerConfiguration implements ApplicationC
 		if (handler == null) {
 			return null;
 		}
-		Map<String, MessageHandler> subscriptions = new HashMap<>(1);
+		Map<String, MessageHandler> subscriptions = new HashMap<>(4);
 		String destination = getBrokerRegistry().getUserDestinationBroadcast();
 		if (destination != null) {
 			subscriptions.put(destination, userDestinationMessageHandler());
@@ -415,15 +420,32 @@ public abstract class AbstractMessageBrokerConfiguration implements ApplicationC
 	}
 
 	@Bean
+	@SuppressWarnings("deprecation")
 	public SimpUserRegistry userRegistry() {
-		return (getBrokerRegistry().getUserRegistryBroadcast() != null ?
-				new MultiServerUserRegistry(createLocalUserRegistry()) : createLocalUserRegistry());
+		SimpUserRegistry registry = createLocalUserRegistry();
+		if (registry == null) {
+			registry = createLocalUserRegistry(getBrokerRegistry().getUserRegistryOrder());
+		}
+		boolean broadcast = getBrokerRegistry().getUserRegistryBroadcast() != null;
+		return (broadcast ? new MultiServerUserRegistry(registry) : registry);
 	}
 
 	/**
-	 * Create the user registry that provides access to the local users.
+	 * Create the user registry that provides access to local users.
+	 * @deprecated as of 5.1 in favor of {@link #createLocalUserRegistry(Integer)}
 	 */
-	protected abstract SimpUserRegistry createLocalUserRegistry();
+	@Deprecated
+	@Nullable
+	protected SimpUserRegistry createLocalUserRegistry() {
+		return null;
+	}
+
+	/**
+	 * Create the user registry that provides access to local users.
+	 * @param order the order to use as a {@link SmartApplicationListener}.
+	 * @since 5.1
+	 */
+	protected abstract SimpUserRegistry createLocalUserRegistry(@Nullable Integer order);
 
 	/**
 	 * Return a {@link org.springframework.validation.Validator

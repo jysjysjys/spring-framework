@@ -100,7 +100,7 @@ public abstract class AbstractJackson2Encoder extends Jackson2CodecSupport imple
 
 	@Override
 	public boolean canEncode(ResolvableType elementType, @Nullable MimeType mimeType) {
-		Class<?> clazz = elementType.resolve(Object.class);
+		Class<?> clazz = elementType.toClass();
 		return supportsMimeType(mimeType) && (Object.class == clazz ||
 				(!String.class.isAssignableFrom(elementType.resolve(clazz)) && getObjectMapper().canSerialize(clazz)));
 	}
@@ -116,8 +116,8 @@ public abstract class AbstractJackson2Encoder extends Jackson2CodecSupport imple
 		JsonEncoding encoding = getJsonEncoding(mimeType);
 
 		if (inputStream instanceof Mono) {
-			return Flux.from(inputStream).map(value ->
-					encodeValue(value, mimeType, bufferFactory, elementType, hints, encoding));
+			return Mono.from(inputStream).map(value ->
+					encodeValue(value, mimeType, bufferFactory, elementType, hints, encoding)).flux();
 		}
 
 		for (MediaType streamingMediaType : this.streamingMediaTypes) {

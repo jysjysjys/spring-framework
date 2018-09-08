@@ -13,38 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.http;
 
-import java.util.ArrayList;
-import java.util.Collections;
+package org.springframework.core.log;
+
 import java.util.List;
 import java.util.function.Predicate;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.NoOpLog;
 
-import org.springframework.util.ObjectUtils;
-
 /**
- * Composite {@link Log} configured with a primary logger and a list of secondary
- * ones to fall back on if the main one is not enabled.
- *
- * <p>This class also declares {@link #webLogger} for use as fallback when
- * logging in the "org.springframework.http" package.
+ * Implementation of {@link Log} that wraps a list of loggers and delegates
+ * to the first one for which logging is enabled at the given level.
  *
  * @author Rossen Stoyanchev
  * @since 5.1
+ * @see LogDelegateFactory#getCompositeLog
  */
-public final class HttpLog implements Log {
+final class CompositeLog implements Log {
 
-	/**
-	 * Logger with category "org.springframework.web.HTTP" to use as fallback
-	 * if "org.springframework.web" is on.
-	 */
-	public static final Log webLogger = LogFactory.getLog("org.springframework.web.HTTP");
-
-	private static final Log noOpLog = new NoOpLog();
+	private static final Log NO_OP_LOG = new NoOpLog();
 
 
 	private final Log fatalLogger;
@@ -60,7 +48,12 @@ public final class HttpLog implements Log {
 	private final Log traceLogger;
 
 
-	private HttpLog(List<Log> loggers) {
+	/**
+	 * Constructor with list of loggers. For optimal performance, the constructor
+	 * checks and remembers which logger is on for each log category.
+	 * @param loggers the loggers to use
+	 */
+	public CompositeLog(List<Log> loggers) {
 		this.fatalLogger = initLogger(loggers, Log::isFatalEnabled);
 		this.errorLogger = initLogger(loggers, Log::isErrorEnabled);
 		this.warnLogger  = initLogger(loggers, Log::isWarnEnabled);
@@ -70,38 +63,38 @@ public final class HttpLog implements Log {
 	}
 
 	private static Log initLogger(List<Log> loggers, Predicate<Log> predicate) {
-		return loggers.stream().filter(predicate).findFirst().orElse(noOpLog);
+		return loggers.stream().filter(predicate).findFirst().orElse(NO_OP_LOG);
 	}
 
 
 	@Override
 	public boolean isFatalEnabled() {
-		return this.fatalLogger != noOpLog;
+		return this.fatalLogger != NO_OP_LOG;
 	}
 
 	@Override
 	public boolean isErrorEnabled() {
-		return this.errorLogger != noOpLog;
+		return this.errorLogger != NO_OP_LOG;
 	}
 
 	@Override
 	public boolean isWarnEnabled() {
-		return this.warnLogger != noOpLog;
+		return this.warnLogger != NO_OP_LOG;
 	}
 
 	@Override
 	public boolean isInfoEnabled() {
-		return this.infoLogger != noOpLog;
+		return this.infoLogger != NO_OP_LOG;
 	}
 
 	@Override
 	public boolean isDebugEnabled() {
-		return this.debugLogger != noOpLog;
+		return this.debugLogger != NO_OP_LOG;
 	}
 
 	@Override
 	public boolean isTraceEnabled() {
-		return this.traceLogger != noOpLog;
+		return this.traceLogger != NO_OP_LOG;
 	}
 
 	@Override
@@ -162,34 +155,6 @@ public final class HttpLog implements Log {
 	@Override
 	public void trace(Object message, Throwable ex) {
 		this.traceLogger.trace(message, ex);
-	}
-
-
-	/**
-	 * Create a composite logger that uses the given primary logger, if enabled,
-	 * or falls back on {@link #webLogger}.
-	 * @param primaryLogger the primary logger
-	 * @return a composite logger
-	 */
-	public static Log create(Log primaryLogger) {
-		return createWith(primaryLogger, webLogger);
-	}
-
-	/**
-	 * Create a composite logger that uses the given primary logger, if enabled,
-	 * or falls back on one of the given secondary loggers..
-	 * @param primaryLogger the primary logger
-	 * @param secondaryLoggers fallback loggers
-	 * @return a composite logger
-	 */
-	public static Log createWith(Log primaryLogger, Log... secondaryLoggers) {
-		if (ObjectUtils.isEmpty(secondaryLoggers)) {
-			return primaryLogger;
-		}
-		List<Log> loggers = new ArrayList<>(1 + secondaryLoggers.length);
-		loggers.add(primaryLogger);
-		Collections.addAll(loggers, secondaryLoggers);
-		return new HttpLog(loggers);
 	}
 
 }

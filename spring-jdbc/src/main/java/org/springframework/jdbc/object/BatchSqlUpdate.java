@@ -18,9 +18,10 @@ package org.springframework.jdbc.object;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import javax.sql.DataSource;
 
@@ -46,7 +47,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 public class BatchSqlUpdate extends SqlUpdate {
 
 	/**
-	 * Default number of inserts to accumulate before commiting a batch (5000).
+	 * Default number of inserts to accumulate before committing a batch (5000).
 	 */
 	public static final int DEFAULT_BATCH_SIZE = 5000;
 
@@ -55,7 +56,7 @@ public class BatchSqlUpdate extends SqlUpdate {
 
 	private boolean trackRowsAffected = true;
 
-	private final LinkedList<Object[]> parameterQueue = new LinkedList<>();
+	private final Deque<Object[]> parameterQueue = new ArrayDeque<>();
 
 	private final List<Integer> rowsAffected = new ArrayList<>();
 

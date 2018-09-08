@@ -62,20 +62,18 @@ public class ResponseStatusExceptionHandler implements WebExceptionHandler {
 
 	@Override
 	public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
-
 		HttpStatus status = resolveStatus(ex);
 		if (status == null || !exchange.getResponse().setStatusCode(status)) {
 			return Mono.error(ex);
 		}
 
-		// Mirrors AbstractHandlerExceptionResolver in spring-webmvc..
-
+		// Mirrors AbstractHandlerExceptionResolver in spring-webmvc...
 		String logPrefix = exchange.getLogPrefix();
 		if (this.warnLogger != null && this.warnLogger.isWarnEnabled()) {
 			this.warnLogger.warn(logPrefix + formatError(ex, exchange.getRequest()), ex);
 		}
-		else if (logger.isDebugEnabled()) {
-			logger.debug(logPrefix + formatError(ex, exchange.getRequest()));
+		else if (logger.isWarnEnabled()) {
+			logger.warn(logPrefix + formatError(ex, exchange.getRequest()));
 		}
 
 		return exchange.getResponse().setComplete();

@@ -121,10 +121,11 @@ public abstract class ClassUtils {
 		primitiveWrapperTypeMap.put(Long.class, long.class);
 		primitiveWrapperTypeMap.put(Short.class, short.class);
 
-		primitiveWrapperTypeMap.forEach((key, value) -> {
-			primitiveTypeToWrapperMap.put(value, key);
-			registerCommonClasses(key);
-		});
+		// Map entry iteration is less expensive to initialize than forEach with lambdas
+		for (Map.Entry<Class<?>, Class<?>> entry : primitiveWrapperTypeMap.entrySet()) {
+			primitiveTypeToWrapperMap.put(entry.getValue(), entry.getKey());
+			registerCommonClasses(entry.getKey());
+		}
 
 		Set<Class<?>> primitiveTypes = new HashSet<>(32);
 		primitiveTypes.addAll(primitiveWrapperTypeMap.values());
@@ -771,6 +772,8 @@ public abstract class ClassUtils {
 	 * @param interfaces the interfaces to merge
 	 * @param classLoader the ClassLoader to create the composite Class in
 	 * @return the merged interface as Class
+	 * @throws IllegalArgumentException if the specified interfaces expose
+	 * conflicting method signatures (or a similar constraint is violated)
 	 * @see java.lang.reflect.Proxy#getProxyClass
 	 */
 	@SuppressWarnings("deprecation")
@@ -885,7 +888,7 @@ public abstract class ClassUtils {
 	public static Class<?> getUserClass(Class<?> clazz) {
 		if (clazz.getName().contains(CGLIB_CLASS_SEPARATOR)) {
 			Class<?> superclass = clazz.getSuperclass();
-			if (superclass != null && Object.class != superclass) {
+			if (superclass != null && superclass != Object.class) {
 				return superclass;
 			}
 		}
@@ -1244,10 +1247,11 @@ public abstract class ClassUtils {
 	 * access (e.g. calls to {@code Class#getDeclaredMethods} etc, this implementation
 	 * will fall back to returning the originally provided method.
 	 * @param method the method to be invoked, which may come from an interface
-	 * @param targetClass the target class for the current invocation.
-	 * May be {@code null} or may not even implement the method.
+	 * @param targetClass the target class for the current invocation
+	 * (may be {@code null} or may not even implement the method)
 	 * @return the specific target method, or the original method if the
-	 * {@code targetClass} doesn't implement it or is {@code null}
+	 * {@code targetClass} does not implement it
+	 * @see #getInterfaceMethodIfPossible
 	 */
 	public static Method getMostSpecificMethod(Method method, @Nullable Class<?> targetClass) {
 		if (targetClass != null && targetClass != method.getDeclaringClass() && isOverridable(method, targetClass)) {
@@ -1268,6 +1272,34 @@ public abstract class ClassUtils {
 			}
 			catch (SecurityException ex) {
 				// Security settings are disallowing reflective access; fall back to 'method' below.
+			}
+		}
+		return method;
+	}
+
+	/**
+	 * Determine a corresponding interface method for the given method handle, if possible.
+	 * <p>This is particularly useful for arriving at a public exported type on Jigsaw
+	 * which can be reflectively invoked without an illegal access warning.
+	 * @param method the method to be invoked, potentially from an implementation class
+	 * @return the corresponding interface method, or the original method if none found
+	 * @since 5.1
+	 * @see #getMostSpecificMethod
+	 */
+	public static Method getInterfaceMethodIfPossible(Method method) {
+		if (Modifier.isPublic(method.getModifiers()) && !method.getDeclaringClass().isInterface()) {
+			Class<?> current = method.getDeclaringClass();
+			while (current != null && current != Object.class) {
+				Class<?>[] ifcs = current.getInterfaces();
+				for (Class<?> ifc : ifcs) {
+					try {
+						return ifc.getMethod(method.getName(), method.getParameterTypes());
+					}
+					catch (NoSuchMethodException ex) {
+						// ignore
+					}
+				}
+				current = current.getSuperclass();
 			}
 		}
 		return method;

@@ -349,7 +349,7 @@ class DefaultWebClient implements WebClient {
 
 		private MultiValueMap<String, String> initCookies() {
 			if (CollectionUtils.isEmpty(this.cookies)) {
-				return (defaultCookies != null ? defaultCookies : new LinkedMultiValueMap<>(0));
+				return (defaultCookies != null ? defaultCookies : new LinkedMultiValueMap<>());
 			}
 			else if (CollectionUtils.isEmpty(defaultCookies)) {
 				return this.cookies;
@@ -463,9 +463,7 @@ class DefaultWebClient implements WebClient {
 								.map(MimeType::getCharset)
 								.orElse(StandardCharsets.ISO_8859_1);
 						if (HttpStatus.resolve(response.rawStatusCode()) != null) {
-							String msg = String.format("ClientResponse has erroneous status code: %d %s",
-									response.statusCode().value(), response.statusCode().getReasonPhrase());
-							return new WebClientResponseException(msg,
+							return WebClientResponseException.create(
 									response.statusCode().value(),
 									response.statusCode().getReasonPhrase(),
 									response.headers().asHttpHeaders(),
