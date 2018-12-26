@@ -16,6 +16,7 @@
 
 package org.springframework.http.codec;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
 
@@ -25,7 +26,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.springframework.core.ResolvableType;
-import org.springframework.core.io.buffer.AbstractDataBufferAllocatingTestCase;
+import org.springframework.core.io.buffer.AbstractLeakCheckingTestCase;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.json.Jackson2JsonDecoder;
@@ -34,9 +35,11 @@ import org.springframework.mock.http.server.reactive.test.MockServerHttpRequest;
 import static org.junit.Assert.*;
 
 /**
+ * Unit tests for {@link ServerSentEventHttpMessageReader}.
+ *
  * @author Sebastien Deleuze
  */
-public class ServerSentEventHttpMessageReaderTests extends AbstractDataBufferAllocatingTestCase {
+public class ServerSentEventHttpMessageReaderTests extends AbstractLeakCheckingTestCase {
 
 	private ServerSentEventHttpMessageReader messageReader =
 			new ServerSentEventHttpMessageReader(new Jackson2JsonDecoder());
@@ -44,17 +47,14 @@ public class ServerSentEventHttpMessageReaderTests extends AbstractDataBufferAll
 
 	@Test
 	public void cantRead() {
-		assertFalse(messageReader.canRead(ResolvableType.forClass(Object.class),
-				new MediaType("foo", "bar")));
+		assertFalse(messageReader.canRead(ResolvableType.forClass(Object.class), new MediaType("foo", "bar")));
 		assertFalse(messageReader.canRead(ResolvableType.forClass(Object.class), null));
 	}
 
 	@Test
 	public void canRead() {
-		assertTrue(messageReader.canRead(ResolvableType.forClass(Object.class),
-				new MediaType("text", "event-stream")));
-		assertTrue(messageReader.canRead(ResolvableType.forClass(ServerSentEvent.class),
-				new MediaType("foo", "bar")));
+		assertTrue(messageReader.canRead(ResolvableType.forClass(Object.class), new MediaType("text", "event-stream")));
+		assertTrue(messageReader.canRead(ResolvableType.forClass(ServerSentEvent.class), new MediaType("foo", "bar")));
 	}
 
 	@Test
@@ -120,7 +120,6 @@ public class ServerSentEventHttpMessageReaderTests extends AbstractDataBufferAll
 
 	@Test
 	public void readString() {
-
 		MockServerHttpRequest request = MockServerHttpRequest.post("/")
 				.body(Mono.just(stringBuffer("data:foo\ndata:bar\n\ndata:baz\n\n")));
 
@@ -173,10 +172,9 @@ public class ServerSentEventHttpMessageReaderTests extends AbstractDataBufferAll
 
 	@Test
 	public void readError() {
-
 		Flux<DataBuffer> body =
 				Flux.just(stringBuffer("data:foo\ndata:bar\n\ndata:baz\n\n"))
-						.mergeWith(Flux.error(new RuntimeException()));
+						.concatWith(Flux.error(new RuntimeException()));
 
 		MockServerHttpRequest request = MockServerHttpRequest.post("/")
 				.body(body);
@@ -189,6 +187,13 @@ public class ServerSentEventHttpMessageReaderTests extends AbstractDataBufferAll
 				.expectNextMatches(elem -> elem.equals("baz"))
 				.expectError()
 				.verify();
+	}
+
+	private DataBuffer stringBuffer(String value) {
+		byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+		DataBuffer buffer = this.bufferFactory.allocateBuffer(bytes.length);
+		buffer.write(bytes);
+		return buffer;
 	}
 
 
